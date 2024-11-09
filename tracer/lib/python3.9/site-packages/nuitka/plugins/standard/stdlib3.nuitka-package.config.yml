@@ -1,0 +1,387 @@
+# yamllint disable rule:line-length
+# yamllint disable rule:indentation
+# yamllint disable rule:comments-indentation
+# too many spelling things, spell-checker: disable
+---
+- module-name: '_asyncio'
+  implicit-imports:
+    - depends:
+        - 'asyncio'
+
+- module-name: '_zoneinfo'
+  implicit-imports:
+    - depends:
+        - 'zoneinfo._common'
+
+- module-name: 'ast'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'base64'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+        'test': "'(lambda: None)'"
+
+- module-name: 'binhex'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'bisect'
+  anti-bloat:
+    - description: 'avoid _bisect module usage'
+      no-auto-follow:
+        '_bisect': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_bisect")'
+
+- module-name: 'calendar'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'copy'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'crypt'
+  anti-bloat:
+    - description: 'avoid _crypt module usage'
+      replacements_plain:
+        '_crypt module was not built as part of CPython': '_crypt module was not included, used --include-module=_crypt'
+      when: 'not has_builtin_module("_crypt")'
+
+- module-name: 'ctypes.util'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'datetime'
+  anti-bloat:
+    - description: 'avoid _datetime module usage'
+      no-auto-follow:
+        '_datetime': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_datetime")'
+
+- module-name: 'difflib'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'dis'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'doctest'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'email.utils'
+  anti-bloat:
+    - description: 'avoid socket module usage'
+      replacements_plain:
+        'import socket': ''
+        'socket.': '__import__("socket").'
+      no-auto-follow:
+        'socket': "can break calls of 'email.utils.make_msgid()'"
+      when: 'not has_builtin_module("_socket")'
+
+- module-name: 'ensurepip'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_main': "'(lambda: None)'"
+
+- module-name: 'ensurepip._uninstall'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_main': "'(lambda: None)'"
+
+- module-name: 'enum'
+  anti-bloat:
+    - replacements_plain:
+        'def __call__(cls, value,': 'def __call__(cls, value=None,'
+        'return cls.__new__(cls, value)': 'return cls.__new__(cls, value if value is not None or cls.__module__ != "PySide6.QtCore" else 0)'
+      when: 'plugin("pyside6")'
+
+- module-name: 'formatter'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'ftplib'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'gzip'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+        'main': "'(lambda: None)'"
+
+- module-name: 'heapq'
+  anti-bloat:
+    - description: 'avoid _heapq module usage'
+      no-auto-follow:
+        '_datetime': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_heapq")'
+
+- module-name: 'imghdr'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'inspect'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_main': "'(lambda: None)'"
+
+- module-name: 'json.decoder'
+  anti-bloat:
+    - description: 'avoid _json module usage'
+      no-auto-follow:
+        '_json': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_json")'
+
+- module-name: 'json.encoder'
+  anti-bloat:
+    - description: 'avoid _json module usage'
+      no-auto-follow:
+        '_json': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_json")'
+
+- module-name: 'json.scanner'
+  anti-bloat:
+    - description: 'avoid _json module usage'
+      no-auto-follow:
+        '_json': 'may slow down by using fallback implementation'
+      when: 'not has_builtin_module("_json")'
+
+- module-name: 'keyword'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'lib2to3.pgen2'
+  data-files:
+    patterns:
+      - '../*.pickle'
+    when: 'not debian_python'
+
+- module-name: 'lib2to3.pgen2.literals'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'lib2to3.refactor'
+  implicit-imports:
+    - depends:
+        - 'lib2to3.fixes.*'
+
+- module-name: 'locale'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'mailbox'
+  anti-bloat:
+    - description: 'avoid fcntl module usage'
+      no-auto-follow:
+        'fcntl': 'may not lock mailbox files properly using fallback implementation'
+      when: 'not has_builtin_module("fcntl")'
+
+- module-name: 'mailcap'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'mimetypes'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_main': "'(lambda: None)'"
+
+- module-name: 'multiprocessing.resource_tracker'
+  anti-bloat:
+    - description: "workaround for starting 'multiprocessing resource tracker"
+      replacements_plain:
+        "args += ['-c', cmd % r]": "args += ['--multiprocessing-resource-tracker', str(r)]"
+      when: 'not module_mode'
+
+- module-name: 'pdb'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+        'help': "'(lambda: None)'"
+
+- module-name: 'pickle'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'pickletools'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'platform'
+  anti-bloat:
+    - description: 'avoid using plistlib dependency on non-macOS'
+      replacements_plain:
+        'import plistlib': 'return None'
+      when: 'not macos'
+
+- module-name: 'pyclbr'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_main': "'(lambda: None)'"
+
+- module-name: 'pydoc'
+  anti-bloat:
+    - description: 'remove module ability to display GUI with tkinter and topics data'
+      replacements:
+        'import pydoc_data.topics': "'raise ImportError'"
+      change_function:
+        'gui': "'(lambda : None)'"
+
+- module-name: 'quopri'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'random'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'site'
+  data-files:
+    patterns:
+      - 'orig-prefix.txt'
+
+- module-name: 'sndhdr'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'tabnanny'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'tarfile'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'telnetlib'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'threading'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        '_test': "'(lambda: None)'"
+
+- module-name: 'tkinter'
+  anti-bloat:
+    - description: 'enhanced tk-inter in case of missing tcl'
+      context:
+        - 'import textwrap'
+      replacements:
+        'self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)': |
+          textwrap.indent("""
+          try:
+            self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+          except _tkinter.TclError as e:
+            if "usable init.tcl" not in str(e):
+              raise\n\
+            sys.exit("Nuitka: Need to use '--enable-plugin=tk-inter' option during compilation for tk-inter to work!")
+          """, "        ")
+      when: 'not deployment and not plugin("tk-inter")'
+  options:
+    checks:
+      - console: 'recommend'
+        when: 'plugin("tk-inter")'
+
+- module-name: 'tokenize'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'trace'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'uu'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'test': "'(lambda: None)'"
+
+- module-name: 'wsgiref.simple_server'
+  implicit-imports:
+    - depends:
+        - 'http.server'
+
+- module-name: 'xml.sax'
+  implicit-imports:
+    - depends:
+        - 'xml.sax.expatreader'
+
+- module-name: 'zipapp'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'zipfile'
+  anti-bloat:
+    - description: 'remove module ability to run as a binary'
+      change_function:
+        'main': "'(lambda: None)'"
+
+- module-name: 'zoneinfo'
+  # This tries to find non-stdlib module when being used.
+  implicit-imports:
+    - depends:
+        - 'tzdata.zoneinfo'
