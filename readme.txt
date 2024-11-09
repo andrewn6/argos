@@ -1,6 +1,6 @@
 hyper-tracer 
 
-Kinda like QIRA, but much much simpler.
+Kinda like QIRA, but focused on python vs program analysis across all architectures
 
 Under 1.5K lines of code
 
