@@ -120,12 +120,16 @@ class Neros:
 
     def analyze_ast_line(self, frame, lineno):
         try:
-            if self.source_lines and 0 <= lineno - 1 < len(self.source_lines):
-                source_line = self.source_lines[lineno - 1]
-                node = ast.parse(source_line.strip()).body[0]
-                self.ast_nodes[lineno] = type(node).__name__
+            if self.source_code:
+                tree = ast.parse(self.source_code)
+                for node in ast.walk(tree):
+                    if hasattr(node, 'lineno'):
+                        self.ast_nodes[node.lineno] = {
+                            'type': type(node).__name__,
+                            'line': self.source_lines[node.lineno - 1].strip() if 0 <= node.lineno - 1 < len(self.source_lines) else ''
+                        }
         except Exception as e:
-            logger.debug(f"Could not parse AST for line {lineno}: {str(e)}")
+            logger.debug(f"Could not parse AST: {str(e)}")
 
     def analyze_bytecode(self, frame):
         try:
