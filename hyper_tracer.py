@@ -290,32 +290,52 @@ class Neros:
 
     def get_trace_results(self):
         try:
-            results = {
-                'success': True,
-                'execution': {
-                    'function_timeline': self.execution_path,
-                    'variables': {
-                        'name': [
-                            {'line': 3, 'value': 'World'},
-                            {'line': 4, 'value': 'World'}
-                        ],
-                        'result': [
-                            {'line': 7, 'value': '5'}
-                        ]
-                    },
-                    'function_calls': {
-                        'hello': 1
-                    }
-                },
-                'source_code': {
-                    'lines': self.source_lines,
-                    'total_lines': len(self.source_lines)
-                },
-                'performance': {
-                    'memory_usage': self.memory_usage,
-                    'cpu_usage': self.cpu_usage
+        # Format each line's execution info
+            execution_trace = []
+            for idx, line in enumerate(self.source_lines, 1):
+                line_info = {
+                    'line_number': idx,
+                    'source': line.strip(),
+                    'variables': {},
+                    'function_calls': [],
+                    'memory': None,
+                    'cpu': None
                 }
+            
+                 # Add variable states for this line
+                for var_name, states in self.variable_states.items():
+                    for line_no, value in states:
+                        if line_no == idx:
+                            line_info['variables'][var_name] = value
+            
+                # Add function call info
+                for path in self.execution_path:
+                    if path[2] == idx:  # path[2] is the line number
+                        line_info['function_calls'].append({
+                            'function': path[1],
+                            'file': path[0]
+                        })
+            
+                # Add performance metrics if available
+                for mem_line, mem_value in self.memory_usage:
+                    if mem_line == idx:
+                        line_info['memory'] = mem_value
+                    
+                execution_trace.append(line_info)
+
+            results = {
+                'summary': {
+                    'total_lines': len(self.source_lines),
+                    'function_calls': dict(self.function_calls),
+                    'total_variables': len(self.variable_states)
+                },
+                'trace': execution_trace,
+                'ast_analysis': self.ast_nodes,
+                'potential_bugs': self.potential_bugs,
+                'code_smells': self.code_smells,
+                'success': True
             }
+        
             return results
         except Exception as e:
             logger.error(f"Error getting trace results: {str(e)}", exc_info=True)

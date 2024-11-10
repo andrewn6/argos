@@ -17,14 +17,16 @@ Current features:
 - Web Interface for interactive visualization
 
 Future:
-- Pattern recognition in execution paths
-- Custom rule creation for code analysis
-- CI/CD pipeline integration
-- Docker container support 
-- Concurrency pattern detection
-- Type inference
-- 3D call graphs
-- Heat maps for performance hotspots
+ - line-by-line execution viewer 
+ - variable state timeline
+ - control flow graph visualization
+ - memory/cpu usage graphs
+
+ - function execution time profiling
+ - I/O operations tracking
+ - Breakpoint support 
+ - Exception tracking
+ - Stack trace visualization
 
 Use cases:
 - Debugging complex systems
