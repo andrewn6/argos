@@ -33,6 +33,59 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+class VariableStateTimeline:
+    def __init__(self):
+        self.timeline = []
+        self.current_step = 0
+        self.variable_history = defaultdict(list)
+    
+    def record_state(self, line_no, variables, scope='global'):
+        timestamp = time.time()
+        state = {
+            'step': self.current_step,
+            'line': line_no,
+            'timestamp': timestamp,
+            'scope': scope,
+            'variables': {}
+        }
+
+        for var_name, value in variables.items():
+            if not var_name.startswith('__'):
+                state['variables'][var_name] = {
+                        'value': repr(value),
+                        'type': repr(value).__name__,
+                        'changed': self._has_changed(var_name, value)
+                }
+
+                # Record variable
+                if self._has_changed(var_name, value):
+                    self.variable_history[var_name].append({
+                        'step': self.current_step,
+                        'line': line_no,
+                        'value': repr(value),
+                        'timestamp': timestamp,
+                    })
+                        
+        self.timeline.append(state)
+        self.current_step += 1
+
+    # Check if var value has changed
+    def _has_changed(self, var_name, new_value):
+        if not self.variable_history[var_name]:
+            return True 
+        last_state = self.variable_history[var_name][-1]
+        return repr(new_value) != last_state['value']
+    
+    # Get history of specific variable
+    def get_variable_history(self, var_name):
+        return self.variable_history.get(var_name, [])
+    
+    # Get program state
+    def get_state_at_step(self, step):
+        if 0 <= step < len(self.timeline):
+            return self.timeline[step]
+        return None
+
 class Neros:
     def __init__(self):
         self.call_stack = []
@@ -56,6 +109,7 @@ class Neros:
         self.source_lines = []
         self.static_analysis_results = None
         self.current_frame = None
+        self.var_timeline = VariableStateTimeline()
 
     def trace_calls(self, frame, event, arg):
         if event == 'call':
@@ -74,6 +128,12 @@ class Neros:
         lineno = frame.f_lineno 
         filename = frame.f_code.co_filename 
         function_name = frame.f_code.co_name 
+        
+        self.var_timeline.record_state(
+                line_no=lineno,
+                variables=frame.f_locals,
+                scope=frame.f_code.co_name
+        )
 
         self.execution_path.append((filename, function_name, lineno))
         self.record_variable_states(frame, lineno)
@@ -333,7 +393,15 @@ class Neros:
                 'ast_analysis': self.ast_nodes,
                 'potential_bugs': self.potential_bugs,
                 'code_smells': self.code_smells,
-                'success': True
+                'success': True,
+                'execution': {
+                    'total_steps': self.var_timeline.current_step,
+                    'variable_timeline': self.var_timeline.timeline,
+                    'variable_histories': {
+                        var: history,
+                        for var, history self.var_timeline.variable_history.items()
+                    }
+                },
             }
         
             return results
