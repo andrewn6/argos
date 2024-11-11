@@ -33,6 +33,81 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+class FunctionAnalyzer:
+    def __init__(self):
+        self.functions = defaultdict(lambda: {
+            'calls': 0,
+            'call_sites': (),
+            'total_time': 0,
+            'avg_time': 0,
+            'paramaters': [],
+            'returns': [],
+            'call_stack': [],
+            'start_times': {},
+            'caller_info': defaultdict(int)
+        })
+        self.current_call = None
+
+    def on_call(self, frame):
+        func_name = frame.f_code.co_name
+        timestamp = time.time()
+
+        self.functions[func_name]['calls'] += 1
+        self.functions[func_name]['call_sites'].add(frame.f_lineno)
+        self.functions[func_name]['parameters'].append(frame.f_locals.copy())
+        self.functions[func_name]['start_times'][id(frame)] = timestamp 
+
+        if self.current_call:
+            self.functions[func_name]['caller_info'][self.current_call] += 1
+
+        self.current_call = func_name
+        self.functions[func_name]['call_stack'].append(timestamp)
+
+
+    def on_return(self, frame, retval):
+        func_name = frame.f_code.co_name
+        end_time = time.time()
+
+        if id(frame) in self.functions[func_name]['start_times']:
+            start_time = self.functions[func_name]['start_times'][id(frame)]
+            duration = end_time - start_time
+
+            self.functions[func_name]['total_time'] += duration
+            self.functions[func_name]['avg_time'] = (
+                    self.functions[func_name]['total_time'] /
+                    self.functions[func_name]['calls']
+            )
+
+            self.functions[func_name]['returns'].append(retval)
+
+            del self.functions[func_name]['start_times'][id(frame)]
+        
+        if self.functions[func_name]['call_stack']:
+            self.functions[func_name]['call_stack'].pop()
+
+        if len(self.functions[func_name]['call_stack']) > 0:
+            self.current_call = func_name
+        else:
+            self.current_call = None
+
+    def get_analysis(self):
+        analysis = {}
+        for func_name, data in self.functions.items():
+            analysis[func_name] = {
+                'total_calls': data['calls'],
+                'unique_call_sites': list(data['call_sites']),
+                'avg_execution_time': data['avg_time'],
+                'total_execution_time': data['total_time'],
+                'parameter_history': [
+                    {k: repr(v) for k, v in params.items()}
+                    for params in data['parameter']
+                ],
+                'return_values': [repr(ret) for ret in data['returns']],
+                'callers': dict(data['caller_info'])
+            }
+
+        return analysis
+
 class VariableStateTimeline:
     def __init__(self):
         self.timeline = []
@@ -110,14 +185,17 @@ class Neros:
         self.static_analysis_results = None
         self.current_frame = None
         self.var_timeline = VariableStateTimeline()
+        self.function_analyzer= FunctionAnalyzer()
 
     def trace_calls(self, frame, event, arg):
         if event == 'call':
+            self.function_analyzer.on_call(frame)
             self.call_stack.append(frame.f_code.co_name)
             self.function_calls[frame.f_code.co_name] += 1
             self.current_frame = frame
             self.analyze_function_complexity(frame)
         elif event == 'return':
+            self.function_analyzer.on_return(frame, arg)
             self.call_stack.pop()
         return self.trace_lines
     
@@ -394,6 +472,7 @@ class Neros:
                 'potential_bugs': self.potential_bugs,
                 'code_smells': self.code_smells,
                 'success': True,
+                'function_analysis': self.function_analyzer.get_analysis(),
                 'execution': {
                     'total_steps': self.var_timeline.current_step,
                     'variable_timeline': self.var_timeline.timeline,
