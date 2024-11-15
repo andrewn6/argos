@@ -42,7 +42,7 @@ class FunctionAnalyzer:
             'call_sites': set(),
             'total_time': 0,
             'avg_time': 0,
-            'paramaters': [],
+            'parameters': [],
             'returns': [],
             'call_stack': [],
             'start_times': {},
@@ -102,7 +102,7 @@ class FunctionAnalyzer:
                 'total_execution_time': data['total_time'],
                 'parameter_history': [
                     {k: repr(v) for k, v in params.items()}
-                    for params in data['parameter']
+                    for params in data['parameters']
                 ],
                 'return_values': [repr(ret) for ret in data['returns']],
                 'callers': dict(data['caller_info'])
@@ -130,7 +130,7 @@ class VariableStateTimeline:
             if not var_name.startswith('__'):
                 state['variables'][var_name] = {
                         'value': repr(value),
-                        'type': repr(value).__name__,
+                        'type': type(value).__name__,
                         'changed': self._has_changed(var_name, value)
                 }
 
@@ -231,11 +231,11 @@ class Neros:
     def record_variable_states(self, frame, lineno):
         for var_name, var_value in frame.f_locals.items():
             state = (lineno, repr(var_value))
-            print(f"Appending to {var_name}: {state}")
+            # For debugging print(f"Appending to {var_name}: {state}")
             self.variable_states[var_name].append(state)
 
     def record_execution_time(self, lineno):
-        start_time = time.time(0)
+        start_time = time.time()
         yield 
         end_time = time.time()
         self.line_execution_times[lineno].append(end_time - start_time)
@@ -464,6 +464,7 @@ class Neros:
                 execution_trace.append(line_info)
 
             results = {
+                'success': True,
                 'summary': {
                     'total_lines': len(self.source_lines),
                     'function_calls': dict(self.function_calls),
@@ -473,7 +474,6 @@ class Neros:
                 'ast_analysis': self.ast_nodes,
                 'potential_bugs': self.potential_bugs,
                 'code_smells': self.code_smells,
-                'success': True,
                 'function_analysis': self.function_analyzer.get_analysis(),
                 'execution': {
                     'total_steps': self.var_timeline.current_step,
@@ -484,7 +484,8 @@ class Neros:
                     }
                 },
             }
-        
+            
+            logger.debug(f"Trace results: {results}")
             return results
         except Exception as e:
             logger.error(f"Error getting trace results: {str(e)}", exc_info=True)
@@ -506,9 +507,11 @@ def index():
 def memory():
     return render_template('memory.html')
 
-@app.route("/trace", methods=["POST"])
+@app.route('/trace', methods=["POST", "GET"])
 def trace():
-    global last_analysis_results
+    if request.method == "GET":
+        return render_template('trace.html')
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part", "success": False}), 400
     
@@ -520,23 +523,23 @@ def trace():
     if file:
         try:
             code = file.read().decode('utf-8')
-            logger.debug(f"Raw code content: {repr(code)}")
+            logger.debug(f"Raw code content: {code}")
             
             if not code:
                 return jsonify({"error": "Empty file", "success": False}), 400
                 
             logger.debug("Generating trace...")
             trace_results = generate_trace(code)
-            last_analysis_results = trace_results
             
-            # Log the entire trace_results before returning
-            logger.debug("=== START TRACE RESULTS ===")
-            logger.debug(f"{trace_results}")
-            logger.debug("=== END TRACE RESULTS ===")
-            
-            response = jsonify(trace_results)
-            logger.debug("Successfully created JSON response")
-            return response
+            if not trace_results:
+                logger.error("No trace results generated")
+                return jsonify({"error": "No analysis results", "success": False}), 500
+
+            logger.debug(f"Trace structure: {list(trace_results.keys())}")
+            logger.debug(f"Number of trace lines: {len(trace_results.get('trace', []))}")
+            logger.debug(f"Variable histories: {list(trace_results.get('execution', {}).get('variable_histories', {}).keys())}")
+
+            return jsonify(trace_results)
             
         except Exception as e:
             logger.error(f"Trace error: {e}", exc_info=True)
@@ -545,7 +548,7 @@ def trace():
                 "success": False
             }), 500
 
-@app.route('/api/memory')
+@app.route('/api/memory', methods=["GET", "POST"])
 def get_memory():
     try:
         if last_analysis_results is None:

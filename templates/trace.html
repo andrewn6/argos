@@ -44,80 +44,160 @@
             const fileInput = document.getElementById('codeFile');
             const errorDiv = document.getElementById('errorMessage');
             
+            console.log("File input:", fileInput.files[0]); // Debug log
+            
             if (!fileInput.files[0]) {
                 errorDiv.textContent = 'Please select a file';
                 return;
             }
-
+    
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-
+    
             try {
+                console.log("Sending request with file:", fileInput.files[0].name); // Debug log
                 const response = await fetch('/trace', {
                     method: 'POST',
                     body: formData
                 });
-
+    
+                console.log("Response received:", response.status); // Debug log
                 const data = await response.json();
+                console.log("Data received:", data); // Debug log
                 
                 if (!data.success) {
                     throw new Error(data.error || 'Analysis failed');
                 }
-
+    
                 // Update UI with results
+                document.getElementById('timeline').style.display = 'block';
+                document.getElementById('codeViewer').style.display = 'block';
+                
                 updateTimeline(data);
                 updateCodeView(data);
                 updateStatePanel(data);
                 
                 errorDiv.textContent = '';
             } catch (error) {
-                errorDiv.textContent = error.message;
+                errorDiv.textContent = `Error: ${error.message}`;
                 console.error('Analysis error:', error);
             }
         }
-
+    
         function updateTimeline(data) {
             const timeline = document.getElementById('timeline');
-            timeline.innerHTML = '<div class="section-header">Execution Timeline</div>' +
-                data.trace.map((line, index) => `
-                    <div class="timeline-entry" onclick="showStep(${index})">
-                        <div class="line-info">Line ${line.line_number}</div>
+            if (!timeline) {
+                console.error("Timeline element not found!");
+                return;
+            }
+
+            console.log("Updating timeline with execution data:", data.execution);
+    
+            let timelineHtml = '<div class="section-header">Execution Timeline</div>';
+    
+            // Use the execution timeline data
+            if (data.execution && data.execution.variable_timeline) {
+                timelineHtml += data.execution.variable_timeline.map(step => `
+                    <div class="timeline-entry" onclick="showStep(${step.step})">
+                        <div class="step-info">Step ${step.step}</div>
+                        <div class="line-info">Line ${step.line}: ${step.scope}</div>
+                        <div class="vars-changed">
+                            ${Object.entries(step.variables)
+                                .filter(([_, v]) => v.changed)
+                                .map(([name, _]) => name)
+                                .join(', ')}
+                        </div>
                     </div>
-                `).join('');
+            `).join('');
         }
 
+            timeline.innerHTML = timelineHtml;
+        }
+    
         function updateCodeView(data) {
             const codeViewer = document.getElementById('codeViewer');
-            codeViewer.innerHTML = data.trace.map(line => `
+            if (!codeViewer) {
+                console.error("Code viewer element not found!");
+                return;
+            }
+            console.log("Updating code view with data:", data); // Debug log
+            codeViewer.innerHTML = (data.trace || []).map(line => `
                 <div class="code-line" id="line-${line.line_number}">
                     <span class="line-number">${line.line_number}</span>
                     <span class="line-content">${line.source}</span>
                 </div>
             `).join('');
         }
-
+    
         function updateStatePanel(data) {
             const varState = document.getElementById('variableState');
             const funcCalls = document.getElementById('functionCalls');
-            
-            // Update variable state
-            varState.innerHTML = Object.entries(data.execution?.variable_histories || {})
-                .map(([name, history]) => `
+    
+            if (!varState || !funcCalls) {
+                console.error("State panel elements not found!");
+                return;
+            }
+
+            // Update variable state with better formatting
+            if (data.execution && data.execution.variable_histories) {
+                let varHtml = '';
+                Object.entries(data.execution.variable_histories).forEach(([name, history]) => {
+                varHtml += `
                     <div class="var-entry">
                         <div class="var-name">${name}</div>
-                        <div class="var-value">${JSON.stringify(history)}</div>
+                        <div class="var-history">
+                            ${history.map(state => `
+                                <div class="var-state">
+                                    <span class="var-step">Step ${state.step}</span>
+                                    <span class="var-line">Line ${state.line}</span>
+                                    <span class="var-value">${state.value}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
-                `).join('');
-            
-            // Update function calls
-            funcCalls.innerHTML = Object.entries(data.summary?.function_calls || {})
-                .map(([func, count]) => `
+                `;
+            });
+            varState.innerHTML = varHtml;
+
+            if (data.summary && data.summary.function_calls) {
+             let funcHtml = '<div class="section-header">Function Calls</div>';
+             Object.entries(data.summary.function_calls).forEach(([func, count]) => {
+                funcHtml += `
+                    <div class="function-call-entry">
+                        <span class="func-name">${func}</span>
+                        <span class="call-count">${count} calls</span>
+                    </div>
+                `;
+            });
+            funcCalls.innerHTML = funcHtml;
+        }
+    }
+
+        // Update function calls with better formatting
+        if (data.summary && data.summary.function_calls) {
+            let funcHtml = '<div class="function-calls-header">Function Calls</div>';
+            Object.entries(data.summary.function_calls).forEach(([func, count]) => {
+                funcHtml += `
                     <div class="func-entry">
                         <span class="func-name">${func}</span>
                         <span class="func-count">${count} calls</span>
                     </div>
-                `).join('');
+                `;
+            });
+            funcCalls.innerHTML = funcHtml;
+            }
         }
+    
+        // Make sure the file input and button are properly connected
+        document.addEventListener('DOMContentLoaded', function() {
+            const analyzeButton = document.querySelector('.analyze-btn');
+            if (analyzeButton) {
+                analyzeButton.addEventListener('click', uploadAndAnalyze);
+            } else {
+                console.error("Analyze button not found!");
+            }
+        });
     </script>
+    
 </body>
 </html>
