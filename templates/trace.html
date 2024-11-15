@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Python Code Analysis - Trace</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <a href="/" class="nav-link active">Trace</a>
+        <a href="/memory" class="nav-link">Memory</a>
+    </div>
+
+    <!-- Add Upload Section -->
+    <div class="upload-container">
+        <form id="uploadForm">
+            <input type="file" id="codeFile" accept=".py" class="file-input">
+            <button type="button" onclick="uploadAndAnalyze()" class="analyze-btn">Analyze Code</button>
+        </form>
+        <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <div class="container">
+        <div class="timeline" id="timeline">
+            <div class="section-header">Execution Timeline</div>
+        </div>
+        <div class="main-view">
+            <div class="code-viewer" id="codeViewer">
+                <!-- Code view populated by JS -->
+            </div>
+            <div class="analysis-results" id="analysisResults">
+                <!-- Analysis results populated by JS -->
+            </div>
+        </div>
+        <div class="state-panel">
+            <div class="section-header">Variable State</div>
+            <div id="variableState"></div>
+            <div class="section-header">Function Calls</div>
+            <div id="functionCalls"></div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadAndAnalyze() {
+            const fileInput = document.getElementById('codeFile');
+            const errorDiv = document.getElementById('errorMessage');
+            
+            if (!fileInput.files[0]) {
+                errorDiv.textContent = 'Please select a file';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/trace', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+
+                // Update UI with results
+                updateTimeline(data);
+                updateCodeView(data);
+                updateStatePanel(data);
+                
+                errorDiv.textContent = '';
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                console.error('Analysis error:', error);
+            }
+        }
+
+        function updateTimeline(data) {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = '<div class="section-header">Execution Timeline</div>' +
+                data.trace.map((line, index) => `
+                    <div class="timeline-entry" onclick="showStep(${index})">
+                        <div class="line-info">Line ${line.line_number}</div>
+                    </div>
+                `).join('');
+        }
+
+        function updateCodeView(data) {
+            const codeViewer = document.getElementById('codeViewer');
+            codeViewer.innerHTML = data.trace.map(line => `
+                <div class="code-line" id="line-${line.line_number}">
+                    <span class="line-number">${line.line_number}</span>
+                    <span class="line-content">${line.source}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateStatePanel(data) {
+            const varState = document.getElementById('variableState');
+            const funcCalls = document.getElementById('functionCalls');
+            
+            // Update variable state
+            varState.innerHTML = Object.entries(data.execution?.variable_histories || {})
+                .map(([name, history]) => `
+                    <div class="var-entry">
+                        <div class="var-name">${name}</div>
+                        <div class="var-value">${JSON.stringify(history)}</div>
+                    </div>
+                `).join('');
+            
+            // Update function calls
+            funcCalls.innerHTML = Object.entries(data.summary?.function_calls || {})
+                .map(([func, count]) => `
+                    <div class="func-entry">
+                        <span class="func-name">${func}</span>
+                        <span class="func-count">${count} calls</span>
+                    </div>
+                `).join('');
+        }
+    </script>
+</body>
+</html>

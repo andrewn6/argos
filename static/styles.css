@@ -1,0 +1,220 @@
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #1a1a1a;
+    color: #f0f0f0;
+    font-family: monospace;
+    line-height: 1.4;
+}
+
+/* Navigation */
+.navbar {
+    background: #333;
+    padding: 5px;
+    border-bottom: 1px solid #404040;
+}
+
+.nav-link {
+    color: #f0f0f0;
+    text-decoration: none;
+    padding: 5px 15px;
+    margin-right: 10px;
+    display: inline-block;
+}
+
+.nav-link.active {
+    background: #0066cc;
+}
+
+/* Container layouts */
+.container {
+    display: grid;
+    grid-template-columns: 200px 1fr 300px;
+    height: calc(100vh - 35px);
+}
+
+.memory-container {
+    grid-template-columns: 300px 1fr;
+}
+
+/* Timeline panel */
+.timeline {
+    background: #2a2a2a;
+    border-right: 1px solid #404040;
+    overflow-y: auto;
+}
+
+.timeline-entry {
+    padding: 5px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #333;
+}
+
+.timeline-entry:hover {
+    background: #333;
+}
+
+.timeline-entry.active {
+    background: #0066cc;
+}
+
+/* Main view */
+.main-view {
+    padding: 10px;
+    overflow-y: auto;
+    background: #222;
+}
+
+.code-viewer {
+    font-family: monospace;
+    margin-bottom: 20px;
+}
+
+.code-line {
+    display: flex;
+    padding: 2px 5px;
+}
+
+.code-line:hover {
+    background: #333;
+}
+
+.code-line.executed {
+    background: #1a3d5c;
+}
+
+.line-number {
+    color: #666;
+    min-width: 40px;
+    user-select: none;
+}
+
+.line-content {
+    color: #f0f0f0;
+    white-space: pre;
+}
+
+/* State panel */
+.state-panel {
+    background: #2a2a2a;
+    border-left: 1px solid #404040;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.section-header {
+    font-weight: bold;
+    color: #0066cc;
+    padding: 5px 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #404040;
+}
+
+/* Memory view specific */
+.memory-overview {
+    background: #2a2a2a;
+    border-right: 1px solid #404040;
+    padding: 10px;
+}
+
+.memory-details {
+    padding: 10px;
+    overflow: auto;
+}
+
+.memory-stat {
+    margin-bottom: 10px;
+    padding: 5px;
+    background: #333;
+}
+
+.memory-timeline {
+    height: 200px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+}
+
+.memory-point {
+    flex: 1;
+    background: #0066cc;
+    min-width: 3px;
+}
+
+.memory-table {
+    margin-top: 20px;
+}
+
+.memory-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 100px;
+    padding: 5px;
+    border-bottom: 1px solid #333;
+}
+
+.memory-row:hover {
+    background: #333;
+}
+
+/* Analysis results */
+.analysis-section {
+    background: #2a2a2a;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.issue-item {
+    padding: 5px;
+    margin: 5px 0;
+    background: #333;
+    border-left: 3px solid #cc0000;
+}
+
+/* Error states */
+.error {
+    background: #cc0000;
+    color: white;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 4px;
+}
+
+.upload-container {
+    background: #2a2a2a;
+    padding: 15px;
+    margin: 10px;
+    border-radius: 4px;
+}
+
+.file-input {
+    background: #333;
+    color: #f0f0f0;
+    padding: 8px;
+    margin-right: 10px;
+    border: 1px solid #404040;
+}
+
+.analyze-btn {
+    background: #0066cc;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.analyze-btn:hover {
+    background: #0052a3;
+}
+
+.error-message {
+    color: #ff4444;
+    margin-top: 10px;
+    padding: 5px;
+}

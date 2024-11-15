@@ -20,11 +20,13 @@ from radon.complexity import cc_visit
 from radon.metrics import h_visit
 from radon.raw import analyze
 from sympy import sympify, solve
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 import logging 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+last_analysis_results = None 
 
 app = Flask(__name__)
 
@@ -37,7 +39,7 @@ class FunctionAnalyzer:
     def __init__(self):
         self.functions = defaultdict(lambda: {
             'calls': 0,
-            'call_sites': (),
+            'call_sites': set(),
             'total_time': 0,
             'avg_time': 0,
             'paramaters': [],
@@ -477,8 +479,8 @@ class Neros:
                     'total_steps': self.var_timeline.current_step,
                     'variable_timeline': self.var_timeline.timeline,
                     'variable_histories': {
-                        var: history,
-                        for var, history self.var_timeline.variable_history.items()
+                        var: history
+                        for var, history in self.var_timeline.variable_history.items()
                     }
                 },
             }
@@ -496,9 +498,17 @@ def generate_trace(code):
     tracer.run_trace(code)
     return tracer.get_trace_results()
 
+@app.route('/')
+def index():
+    return render_template('trace.html')
+
+@app.route('/memory')
+def memory():
+    return render_template('memory.html')
 
 @app.route("/trace", methods=["POST"])
 def trace():
+    global last_analysis_results
     if 'file' not in request.files:
         return jsonify({"error": "No file part", "success": False}), 400
     
@@ -517,6 +527,7 @@ def trace():
                 
             logger.debug("Generating trace...")
             trace_results = generate_trace(code)
+            last_analysis_results = trace_results
             
             # Log the entire trace_results before returning
             logger.debug("=== START TRACE RESULTS ===")
@@ -533,7 +544,50 @@ def trace():
                 "error": f"Failed to generate trace: {str(e)}", 
                 "success": False
             }), 500
-         
+
+@app.route('/api/memory')
+def get_memory():
+    try:
+        if last_analysis_results is None:
+            return jsonify({
+                'success': False,
+                'error': 'No analysis results available. Upload and analyze code first.'
+            }), 400
+
+        # Extract memory data from your existing analysis
+        memory_usage = []
+        for line in last_analysis_results.get('trace', []):
+            if 'memory' in line:
+                memory_usage.append({
+                    'line': line['line_number'],
+                    'usage': line['memory'],
+                    'percentage': 100 * line['memory'] / max(t['memory'] for t in last_analysis_results['trace'] if 'memory' in t) if line['memory'] else 0
+                })
+
+        response = {
+            'success': True,
+            'peak_memory': max((t['memory'] for t in last_analysis_results['trace'] if 'memory' in t), default=0),
+            'avg_memory': sum(t['memory'] for t in last_analysis_results['trace'] if 'memory' in t) / len(memory_usage) if memory_usage else 0,
+            'memory_usage': memory_usage,
+            'memory_details': [
+                {
+                    'line': entry['line_number'],
+                    'variable': var,
+                    'value': str(val)[:100]
+                }
+                for entry in last_analysis_results['trace']
+                for var, val in entry.get('variables', {}).items()
+            ]
+        }
+
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error getting memory data: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == "__main__":
     # Run the Flask server
     app.run(debug=True, host='0.0.0.0', port=5000)
