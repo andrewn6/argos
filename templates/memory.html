@@ -1,89 +1,140 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Python Code Analysis - Memory</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Usage</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-    <div class="navbar">
-        <a href="/" class="nav-link">Trace</a>
-        <a href="/memory" class="nav-link active">Memory</a>
+<body class="bg-gray-900 text-white">
+  <div class="container mx-auto py-8">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-3xl font-bold">Memory Usage</h1>
+      <div>
+        <a href="/" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Back to Tracer
+        </a>
+      </div>
     </div>
-    <div class="container memory-container">
-        <div class="memory-overview">
-            <div class="section-header">Memory Overview</div>
-            <div id="memoryStats"></div>
-            <div class="section-header">Timeline</div>
-            <div id="memoryTimeline"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-gray-800 rounded-lg p-4">
+        <h2 class="text-xl font-bold mb-2">Memory Usage Over Time</h2>
+        <canvas id="memoryUsageChart"></canvas>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-4">
+        <h2 class="text-xl font-bold mb-2">Memory Usage by Line</h2>
+        <div class="overflow-x-auto">
+          <table id="memoryTable" class="table-auto w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-2">Line</th>
+                <th class="px-4 py-2">Memory Usage (MB)</th>
+                <th class="px-4 py-2">Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
         </div>
-        <div class="memory-details">
-            <div class="section-header">Memory Usage</div>
-            <div id="memoryUsageChart"></div>
-            <div class="memory-table" id="memoryTable"></div>
-        </div>
+      </div>
     </div>
-    <script>
-        async function loadMemoryData() {
-            try {
-                const response = await fetch('/api/memory');
-                const data = await response.json();
-                
-                if (!data.success) {
-                    throw new Error(data.error);
-                }
+    <div class="mt-4 bg-gray-800 rounded-lg p-4">
+      <h2 class="text-xl font-bold mb-2">Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p class="font-bold">Peak Memory Usage:</p>
+          <p id="peakMemory">-</p>
+        </div>
+        <div>
+          <p class="font-bold">Average Memory Usage:</p>
+          <p id="avgMemory">-</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                updateMemoryStats(data);
-                updateMemoryTimeline(data.memory_usage);
-                updateMemoryTable(data);
-            } catch (error) {
-                console.error('Error loading memory data:', error);
-                showError(error.message);
+  <script>
+    // Fetch memory data from the server
+    fetch('/api/memory')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          displayMemoryUsage(data);
+        } else {
+          console.error('Error fetching memory data:', data.error);
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching memory data:', error);
+      });
+
+    function displayMemoryUsage(data) {
+      // Update peak and average memory usage
+      document.getElementById('peakMemory').textContent = `${data.peak_memory.toFixed(2)} MB`;
+      document.getElementById('avgMemory').textContent = `${data.avg_memory.toFixed(2)} MB`;
+
+      // Populate the memory usage table
+      const memoryTable = document.getElementById('memoryTable').getElementsByTagName('tbody')[0];
+      data.memory_usage.forEach(entry => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-4 py-2">${entry.line}</td>
+          <td class="px-4 py-2">${entry.usage.toFixed(2)}</td>
+          <td class="px-4 py-2">${entry.percentage.toFixed(2)}%</td>
+        `;
+        memoryTable.appendChild(row);
+      });
+
+      // Create the memory usage chart
+      const ctx = document.getElementById('memoryUsageChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.memory_usage.map(entry => `Line ${entry.line}`),
+          datasets: [
+            {
+              label: 'Memory Usage (MB)',
+              data: data.memory_usage.map(entry => entry.usage),
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1
             }
+          ]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Memory Usage (MB)',
+                color: 'white'
+              },
+              ticks: {
+                color: 'white'
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Line Number',
+                color: 'white'
+              },
+              ticks: {
+                color: 'white'
+              }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: 'Memory Usage Over Time',
+              color: 'white'
+            }
+          }
         }
-
-        function updateMemoryStats(data) {
-            const statsEl = document.getElementById('memoryStats');
-            statsEl.innerHTML = `
-                <div class="memory-stat">
-                    <div class="stat-label">Peak Memory</div>
-                    <div class="stat-value">${formatBytes(data.peak_memory)}</div>
-                </div>
-                <div class="memory-stat">
-                    <div class="stat-label">Average Memory</div>
-                    <div class="stat-value">${formatBytes(data.avg_memory)}</div>
-                </div>
-            `;
-        }
-
-        function updateMemoryTimeline(usageData) {
-            const timelineEl = document.getElementById('memoryTimeline');
-            timelineEl.innerHTML = usageData.map((point, index) => `
-                <div class="memory-point" style="height: ${point.percentage}%"
-                     title="Line ${point.line}: ${formatBytes(point.usage)}">
-                </div>
-            `).join('');
-        }
-
-        function updateMemoryTable(data) {
-            const tableEl = document.getElementById('memoryTable');
-            tableEl.innerHTML = data.memory_details.map(detail => `
-                <div class="memory-row">
-                    <div class="memory-line">${detail.line}</div>
-                    <div class="memory-var">${detail.variable}</div>
-                    <div class="memory-size">${formatBytes(detail.size)}</div>
-                </div>
-            `).join('');
-        }
-
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        window.onload = loadMemoryData;
-    </script>
+      });
+    }
+  </script>
 </body>
 </html>

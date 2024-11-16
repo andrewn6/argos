@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 last_analysis_results = None 
 
 app = Flask(__name__)
-
 UPLOAD_FOLDER = 'uploads' 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -319,10 +318,10 @@ class Neros:
         try:
             if self.source_lines and 0 <= lineno - 1 < len(self.source_lines):
                 source_line = self.source_lines[lineno - 1]
-            if 'except:' in source_line or 'except Exception:' in source_line:
-                self.potential_bugs.append(f"Broad exception handler at line {lineno}")
-            if 'global' in source_line:
-                self.potential_bugs.append(f"Global variable usage at line {lineno}")
+                if 'except:' in source_line or 'except Exception:' in source_line:
+                    self.potential_bugs.append(f"Broad exception handler at line {lineno}")
+                if 'global' in source_line:
+                    self.potential_bugs.append(f"Global variable usage at line {lineno}")
         except Exception as e:
             logger.error(f"Error detecting potential bugs: {str(e)}")
             
@@ -481,7 +480,7 @@ class Neros:
                     'variable_histories': {
                         var: history
                         for var, history in self.var_timeline.variable_history.items()
-                    }
+                    },
                 },
             }
             
@@ -509,44 +508,45 @@ def memory():
 
 @app.route('/trace', methods=["POST", "GET"])
 def trace():
-    if request.method == "GET":
-        return render_template('trace.html')
+   if request.method == "GET":
+       return render_template('trace.html')
 
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part", "success": False}), 400
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        return jsonify({"error": "No selected file", "success": False}), 400
-    
-    if file:
-        try:
-            code = file.read().decode('utf-8')
-            logger.debug(f"Raw code content: {code}")
-            
-            if not code:
-                return jsonify({"error": "Empty file", "success": False}), 400
-                
-            logger.debug("Generating trace...")
-            trace_results = generate_trace(code)
-            
-            if not trace_results:
-                logger.error("No trace results generated")
-                return jsonify({"error": "No analysis results", "success": False}), 500
+   if 'file' not in request.files:
+       return jsonify({"error": "No file part", "success": False}), 400
+   
+   file = request.files['file']
+   
+   if file.filename == '':
+       return jsonify({"error": "No selected file", "success": False}), 400
+   
+   if file:
+       try:
+           code = file.read().decode('utf-8')
+           logger.debug(f"Raw code content: {code}")
+           
+           if not code:
+               return jsonify({"error": "Empty file", "success": False}), 400
+               
+           logger.debug("Generating trace...")
+           trace_results = generate_trace(code)
+           
+           if not trace_results:
+               logger.error("No trace results generated")
+               return jsonify({"error": "No analysis results", "success": False}), 500
 
-            logger.debug(f"Trace structure: {list(trace_results.keys())}")
-            logger.debug(f"Number of trace lines: {len(trace_results.get('trace', []))}")
-            logger.debug(f"Variable histories: {list(trace_results.get('execution', {}).get('variable_histories', {}).keys())}")
+           logger.debug(f"Trace structure: {list(trace_results.keys())}")
+           logger.debug(f"Number of trace lines: {len(trace_results.get('trace', []))}")
+           logger.debug(f"Variable histories: {list(trace_results.get('execution', {}).get('variable_histories', {}).keys())}")
 
-            return jsonify(trace_results)
-            
-        except Exception as e:
-            logger.error(f"Trace error: {e}", exc_info=True)
-            return jsonify({
-                "error": f"Failed to generate trace: {str(e)}", 
-                "success": False
-            }), 500
+           return jsonify(trace_results)
+           
+       except Exception as e:
+           logger.error(f"Trace error: {e}", exc_info=True)
+           return jsonify({
+               "error": f"Failed to generate trace: {str(e)}", 
+               "success": False
+           }), 500
+   
 
 @app.route('/api/memory', methods=["GET", "POST"])
 def get_memory():
@@ -558,7 +558,7 @@ def get_memory():
             }), 400
 
         # Extract memory data from your existing analysis
-        memory_usage = []
+        memory_usage = last_analysis_results['memory']
         for line in last_analysis_results.get('trace', []):
             if 'memory' in line:
                 memory_usage.append({

@@ -1,3 +1,4 @@
 .vagrant
 tracer/
 __pycache__
+myenv

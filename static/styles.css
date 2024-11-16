@@ -286,3 +286,39 @@ body {
     margin: 10px;
     border-radius: 4px;
 }
+
+.bytecode-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+  }
+  
+  .bytecode-name {
+    color: #f0f0f0;
+  }
+  
+  .bytecode-count {
+    color: #00ff00;
+  }
+  
+  .thread-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+  }
+  
+  .thread-name {
+    color: #f0f0f0;
+  }
+  
+  .thread-activity {
+    display: flex;
+    gap: 2px;
+  }
+  
+  .thread-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
