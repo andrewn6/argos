@@ -12,6 +12,8 @@ import time
 import os
 import sys
 import dis
+import types
+
 from io import StringIO
 from pylint import run_pylint
 from memory_profiler import memory_usage
@@ -114,14 +116,28 @@ class VariableStateTimeline:
         self.timeline = []
         self.current_step = 0
         self.variable_history = defaultdict(list)
+        self.scope_states = {}
     
     def record_state(self, line_no, variables, scope='global'):
         timestamp = time.time()
+
+        if scope not in self.scope_states:
+            self.scope_states[scope] = "undefined"
+
+        if any(k.startswith('__') for k in variables.keys()):
+            self.scope_states[scope] = "initializing"
+
+        elif any(isinstance(v, types.FunctionType) for v in variables.values()):
+            self.scope_states[scope] = "defined"
+
+        elif variables:
+            self.scope_states[scope] = "executing"
+
         state = {
             'step': self.current_step,
             'line': line_no,
             'timestamp': timestamp,
-            'scope': scope,
+            'scope': self.scope_states[scope],
             'variables': {}
         }
 
@@ -130,7 +146,8 @@ class VariableStateTimeline:
                 state['variables'][var_name] = {
                         'value': repr(value),
                         'type': type(value).__name__,
-                        'changed': self._has_changed(var_name, value)
+                        'changed': self._has_changed(var_name, value),
+                        'address': hex(id(value))
                 }
 
                 # Record variable
@@ -140,6 +157,7 @@ class VariableStateTimeline:
                         'line': line_no,
                         'value': repr(value),
                         'timestamp': timestamp,
+                        'state': 'defined' if value is not None else 'undefined'
                     })
                         
         self.timeline.append(state)
@@ -482,6 +500,23 @@ class Neros:
                         for var, history in self.var_timeline.variable_history.items()
                     },
                 },
+                'control_flow': {
+                    'nodes': list(self.control_flow_graph.nodes()),
+                    'edges': list(self.control_flow_graph.edges()),
+                    'jumps': [
+                        (lineno, target) for lineno, line in enumerate(self.source_lines,1 )
+                        if 'jmp' in line.lower() or 'call' in line.lower()
+                        for target in self.control_flow_graph.successors(lineno)
+                    ],
+                    'instructions': [
+                        {
+                            'lineno': idx + 1,
+                            'text': line.strip(),
+                            'type': 'jump' if any(x in line.lower() for x in ['jmp', 'call', 'cmp']) else 'normal'
+                        }
+                        for idx, line in enumerate(self.source_lines)
+                    ]
+                }
             }
             
             logger.debug(f"Trace results: {results}")
