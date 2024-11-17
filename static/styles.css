@@ -108,38 +108,63 @@ body {
 
 /* Main view */
 .main-view {
-    padding: 10px;
-    overflow-y: auto;
-    background: #222;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .code-viewer {
-    font-family: monospace;
-    margin-bottom: 20px;
+    flex: 0 0 50%;
+    overflow-y: auto;
+    max-height: 50vh;
+    border-bottom: 1px solid #ccc;
+    background: #2a2a2a;
+    padding: 10px;
 }
 
 .code-line {
-    display: flex;
+    font-family: monospace;
     padding: 2px 5px;
+    display: flex;
+    gap: 10px;
+}
+
+
+#controlFlowGraph {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    user-select: none;
+}
+
+.flow-diagram {
+    background-color: #0a0a0a;
+    padding: 20px;
+    border-top: 1px solid #1a1a1a;
+    cursor: grab;
+}
+
+.flow-diagram:active {
+  cursor: grabbing;
 }
 
 .code-line:hover {
-    background: #333;
+    background: #e9ecef;
 }
+
 
 .code-line.executed {
     background: #1a3d5c;
 }
 
 .line-number {
-    color: #666;
-    min-width: 40px;
-    user-select: none;
+    color: #6c757d;
+    min-width: 3em;
+    text-align: right;
 }
 
 .line-content {
-    color: #f0f0f0;
-    white-space: pre;
+    flex: 1;
 }
 
 /* Variable State panel */
@@ -322,3 +347,23 @@ body {
     height: 10px;
     border-radius: 50%;
   }
+
+
+
+.tooltip-group {
+    pointer-events: all;
+}
+
+/* Scrollbar styling */
+.tooltip-group div::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tooltip-group div::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.tooltip-group div::-webkit-scrollbar-thumb {
+    background: #00ff00;
+    border-radius: 3px;
+}

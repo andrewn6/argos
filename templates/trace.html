@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=<!DOCTYPE html>
 <html>
 <head>
     <title>Python Code Analysis - Trace</title>
@@ -10,7 +10,6 @@
         <a href="/memory" class="nav-link">Memory</a>
     </div>
 
-    <!-- Add Upload Section -->
     <div class="upload-container">
         <form id="uploadForm">
             <input type="file" id="codeFile" accept=".py" class="file-input">
@@ -26,6 +25,9 @@
         <div class="main-view">
             <div class="code-viewer" id="codeViewer">
                 <!-- Code view populated by JS -->
+            </div>
+            <div class="flow-diagram" id="flowDiagram">
+                <svg id="controlFlowGraph" width="100%" height="400"></svg>
             </div>
             <div class="analysis-results" id="analysisResults">
                 <!-- Analysis results populated by JS -->
@@ -44,7 +46,7 @@
             const fileInput = document.getElementById('codeFile');
             const errorDiv = document.getElementById('errorMessage');
             
-            console.log("File input:", fileInput.files[0]); // Debug log
+            console.log("File input:", fileInput.files[0]);
             
             if (!fileInput.files[0]) {
                 errorDiv.textContent = 'Please select a file';
@@ -55,21 +57,23 @@
             formData.append('file', fileInput.files[0]);
     
             try {
-                console.log("Sending request with file:", fileInput.files[0].name); // Debug log
+                console.log("Sending request with file:", fileInput.files[0].name);
                 const response = await fetch('/trace', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    headers : { 
+                        'Accept': 'application/json',
+                    }
                 });
     
-                console.log("Response received:", response.status); // Debug log
+                console.log("Response received:", response.status);
                 const data = await response.json();
-                console.log("Data received:", data); // Debug log
+                console.log("Data received:", data);
                 
                 if (!data.success) {
                     throw new Error(data.error || 'Analysis failed');
                 }
     
-                // Update UI with results
                 document.getElementById('timeline').style.display = 'block';
                 document.getElementById('codeViewer').style.display = 'block';
                 
@@ -83,7 +87,7 @@
                 console.error('Analysis error:', error);
             }
         }
-    
+
         function updateTimeline(data) {
             const timeline = document.getElementById('timeline');
             if (!timeline) {
@@ -95,7 +99,6 @@
     
             let timelineHtml = '<div class="section-header">Execution Timeline</div>';
     
-            // Use the execution timeline data
             if (data.execution && data.execution.variable_timeline) {
                 timelineHtml += data.execution.variable_timeline.map(step => `
                     <div class="timeline-entry" onclick="showStep(${step.step})">
@@ -108,27 +111,250 @@
                                 .join(', ')}
                         </div>
                     </div>
-            `).join('');
-        }
+                `).join('');
+            }
 
             timeline.innerHTML = timelineHtml;
         }
+
+        function drawControlFlowGraph(data) {
+            if (!data.execution) {
+                console.error("No execution data available");
+                return;
+            }
+
+            const svg = document.getElementById('controlFlowGraph');
+            const width = svg.clientWidth;
+            const height = 400;
+            const nodeHeight = 30; 
+            const nodeWidth = 180;  
+            const padding = 40;     
+
+            svg.innerHTML = '';
     
+            // Add grid background
+            const grid = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+            grid.setAttribute('id', 'grid');
+            grid.setAttribute('width', '20');
+            grid.setAttribute('height', '20');
+            grid.setAttribute('patternUnits', 'userSpaceOnUse');
+    
+            const gridPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            gridPath.setAttribute('d', 'M 20 0 L 0 0 0 20');
+            gridPath.setAttribute('fill', 'none');
+            gridPath.setAttribute('stroke', '#1a1a1a');
+            gridPath.setAttribute('stroke-width', '0.5');
+    
+            grid.appendChild(gridPath);
+            svg.appendChild(grid);
+
+            // Add background rectangle
+            const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            background.setAttribute('width', '100%');
+            background.setAttribute('height', '100%');
+            background.setAttribute('fill', 'url(#grid)');
+            svg.appendChild(background);
+
+            // Create nodes
+            const steps = data.execution.variable_timeline;
+            let nodes = steps.map((step, index) => ({
+                id: step.line,
+                text: `${step.scope}: ${step.line}`,
+                details: Object.entries(step.variables)
+                    .map(([name, data]) => `${name}: ${data.address}`)
+                    .join('\n'),
+                x: width/2 - nodeWidth/2 + (index % 2 ? 100 : -100), // Zigzag layout
+                y: padding + index * (nodeHeight + padding/2),
+                step: step.step
+            }));
+
+            // Draw edges
+            for (let i = 0; i < nodes.length - 1; i++) {
+                const fromNode = nodes[i];
+                const toNode = nodes[i + 1];
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        
+                // Calculate control points for curved paths
+                const midY = (fromNode.y + toNode.y) / 2;
+                const pathData = `M ${fromNode.x + nodeWidth/2} ${fromNode.y + nodeHeight}
+                         C ${fromNode.x + nodeWidth/2} ${midY},
+                           ${toNode.x + nodeWidth/2} ${midY},
+                           ${toNode.x + nodeWidth/2} ${toNode.y}`;
+        
+                path.setAttribute('d', pathData);
+                path.setAttribute('stroke', '#00ff00');
+                path.setAttribute('stroke-width', '1');
+                path.setAttribute('fill', 'none');
+                path.setAttribute('opacity', '0.5');
+                // Add glow effect
+                path.setAttribute('filter', 'url(#glow)');
+                svg.appendChild(path);
+            }
+
+            // Add glow filter
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            filter.setAttribute('id', 'glow');
+            filter.innerHTML = `
+                <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            `;
+            defs.appendChild(filter);
+            svg.appendChild(defs);
+
+            // Draw nodes
+            nodes.forEach(node => {
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x);
+                rect.setAttribute('y', node.y);
+                rect.setAttribute('width', nodeWidth);
+                rect.setAttribute('height', nodeHeight);
+                rect.setAttribute('fill', '#0a0a0a');
+                rect.setAttribute('stroke', '#00ff00');
+                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('rx', '2');
+                rect.setAttribute('filter', 'url(#glow)');
+
+                // Address text
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x + 5);
+                text.setAttribute('y', node.y + nodeHeight/2);
+                text.setAttribute('fill', '#00ff00');
+                text.setAttribute('font-family', 'monospace');
+                text.setAttribute('font-size', '10px');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.textContent = node.text;
+
+
+                group.addEventListener('click', () => {
+                    const existingTooltips = svg.querySelectorAll('.tooltip-group');
+                    existingTooltips.forEach(t => t.remove());
+
+                    const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    tooltip.classList.add('tooltip-group');  // Add class for easy selection
+    
+                    const tooltipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    const tooltipForeign = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+    
+                    tooltipRect.setAttribute('x', node.x + nodeWidth + 5);
+                    tooltipRect.setAttribute('y', node.y);
+                    tooltipRect.setAttribute('width', nodeWidth);
+                    tooltipRect.setAttribute('height', 150);  // Fixed height
+                    tooltipRect.setAttribute('fill', '#1a1a1a');
+                    tooltipRect.setAttribute('stroke', '#00ff00');
+    
+                    tooltipForeign.setAttribute('x', node.x + nodeWidth + 5);
+                    tooltipForeign.setAttribute('y', node.y);
+                    tooltipForeign.setAttribute('width', nodeWidth);
+                    tooltipForeign.setAttribute('height', 150);
+    
+                    const tooltipDiv = document.createElement('div');
+                    tooltipDiv.style.cssText = `
+                        color: #00ff00;
+                        font-family: monospace;
+                        font-size: 10px;
+                        padding: 5px;
+                        height: 140px;
+                        overflow-y: auto;
+                        overflow-x: hidden;
+                        scrollbar-width: thin;
+                        scrollbar-color: #00ff00 #1a1a1a;
+                    `;
+    
+
+                    const closeBtn = document.createElement('div');
+                    closeBtn.innerHTML = '✕';
+                    closeBtn.style.cssText = `
+                        position: absolute;
+                        right: 5px;
+                        top: 2px;
+                        cursor: pointer;
+                        color: #00ff00;
+                    `;
+                    closeBtn.onclick = () => tooltip.remove();
+    
+                    tooltipDiv.appendChild(closeBtn);
+    
+                    // Add content
+                    const content = document.createElement('pre');
+                    content.style.cssText = `
+                     margin: 15px 0 0 0;
+                     white-space: pre-wrap;
+                     word-break: break-all;
+                `;  
+                content.textContent = node.details;
+                tooltipDiv.appendChild(content);
+    
+                tooltipForeign.appendChild(tooltipDiv);
+                tooltip.appendChild(tooltipRect);
+                tooltip.appendChild(tooltipForeign);
+                 svg.appendChild(tooltip);
+                });
+
+
+                group.appendChild(rect);
+                group.appendChild(text);
+                svg.appendChild(group);
+
+                let isDragging = false;
+                let dragStartY = 0;
+                let currentOffset = 0;
+
+                const container = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                svg.appendChild(container);
+
+                svg.addEventListener('mousedown', (e) => {
+                  isDragging = true;
+                  dragStartY = e.clientY - currentOffset;
+                });
+
+                svg.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                      const newOffset = e.clientY - dragStartY;
+                      container.setAttribute('transform', `'translate(0, ${newOffset})`);
+                      currentOffset = newOffset;
+                    }
+                });
+
+                svg.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                svg.addEventListener('mouseleave', () => {
+                    isDragging = false;
+                });
+
+                svg.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    currentOffset =+ e.deltaY;
+                    container.setAttribute('transform', `translate(0, ${currentOffset})`);
+                });
+        });
+    }
+        
+
         function updateCodeView(data) {
             const codeViewer = document.getElementById('codeViewer');
             if (!codeViewer) {
                 console.error("Code viewer element not found!");
                 return;
             }
-            console.log("Updating code view with data:", data); // Debug log
+            console.log("Updating code view with data:", data);
             codeViewer.innerHTML = (data.trace || []).map(line => `
                 <div class="code-line" id="line-${line.line_number}">
                     <span class="line-number">${line.line_number}</span>
                     <span class="line-content">${line.source}</span>
                 </div>
             `).join('');
+
+            drawControlFlowGraph(data);
         }
-    
+
         function updateStatePanel(data) {
             const varState = document.getElementById('variableState');
             const funcCalls = document.getElementById('functionCalls');
@@ -138,57 +364,41 @@
                 return;
             }
 
-            // Update variable state with better formatting
             if (data.execution && data.execution.variable_histories) {
                 let varHtml = '';
                 Object.entries(data.execution.variable_histories).forEach(([name, history]) => {
-                varHtml += `
-                    <div class="var-entry">
-                        <div class="var-name">${name}</div>
-                        <div class="var-history">
-                            ${history.map(state => `
-                                <div class="var-state">
-                                    <span class="var-step">Step ${state.step}</span>
-                                    <span class="var-line">Line ${state.line}</span>
-                                    <span class="var-value">${state.value}</span>
-                                </div>
-                            `).join('')}
+                    varHtml += `
+                        <div class="var-entry">
+                            <div class="var-name">${name}</div>
+                            <div class="var-history">
+                                ${history.map(state => `
+                                    <div class="var-state">
+                                        <span class="var-step">Step ${state.step}</span>
+                                        <span class="var-line">Line ${state.line}</span>
+                                        <span class="var-value">${state.value}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
-                    </div>
-                `;
-            });
-            varState.innerHTML = varHtml;
+                    `;
+                });
+                varState.innerHTML = varHtml;
+            }
 
             if (data.summary && data.summary.function_calls) {
-             let funcHtml = '<div class="section-header">Function Calls</div>';
-             Object.entries(data.summary.function_calls).forEach(([func, count]) => {
-                funcHtml += `
-                    <div class="function-call-entry">
-                        <span class="func-name">${func}</span>
-                        <span class="call-count">${count} calls</span>
-                    </div>
-                `;
-            });
-            funcCalls.innerHTML = funcHtml;
-        }
-    }
-
-        // Update function calls with better formatting
-        if (data.summary && data.summary.function_calls) {
-            let funcHtml = '<div class="function-calls-header">Function Calls</div>';
-            Object.entries(data.summary.function_calls).forEach(([func, count]) => {
-                funcHtml += `
-                    <div class="func-entry">
-                        <span class="func-name">${func}</span>
-                        <span class="func-count">${count} calls</span>
-                    </div>
-                `;
-            });
-            funcCalls.innerHTML = funcHtml;
+                let funcHtml = '<div class="section-header">Function Calls</div>';
+                Object.entries(data.summary.function_calls).forEach(([func, count]) => {
+                    funcHtml += `
+                        <div class="function-call-entry">
+                            <span class="func-name">${func}</span>
+                            <span class="call-count">${count} calls</span>
+                        </div>
+                    `;
+                });
+                funcCalls.innerHTML = funcHtml;
             }
         }
-    
-        // Make sure the file input and button are properly connected
+
         document.addEventListener('DOMContentLoaded', function() {
             const analyzeButton = document.querySelector('.analyze-btn');
             if (analyzeButton) {
@@ -198,6 +408,5 @@
             }
         });
     </script>
-    
 </body>
 </html>
