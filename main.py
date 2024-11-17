@@ -13,6 +13,8 @@ import os
 import sys
 import dis
 import types
+import dis
+import marshal
 
 from io import StringIO
 from pylint import run_pylint
@@ -31,7 +33,7 @@ logger = logging.getLogger(__name__)
 last_analysis_results = None 
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads' 
+UPLOAD_FOLDER = 'auto_tests/binaries' 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -180,7 +182,7 @@ class VariableStateTimeline:
             return self.timeline[step]
         return None
 
-class Neros:
+class Argos:
     def __init__(self):
         self.call_stack = []
         self.variable_states = defaultdict(list)
@@ -205,6 +207,16 @@ class Neros:
         self.current_frame = None
         self.var_timeline = VariableStateTimeline()
         self.function_analyzer= FunctionAnalyzer()
+    
+    def run_trace_bytecode(self, bytecode):
+        if isinstance(bytecode, types.CodeType):
+            compiled_code = bytecode
+        else:
+            compiled_code = marshal.loads(bytecode)
+        sys.settrace(self.trace_calls)
+        exec(compiled_code)
+        sys.settrace(None)
+        self.post_execution_analysis(compiled_code)
 
     def trace_calls(self, frame, event, arg):
         if event == 'call':
@@ -528,9 +540,9 @@ class Neros:
                 'error': str(e)
             }
 
-def generate_trace(code):
-    tracer = Neros()
-    tracer.run_trace(code)
+def generate_trace(bytecode):
+    tracer = Argos()
+    tracer.run_trace_bytecode(bytecode)
     return tracer.get_trace_results()
 
 @app.route('/')
@@ -543,46 +555,63 @@ def memory():
 
 @app.route('/trace', methods=["POST", "GET"])
 def trace():
-   if request.method == "GET":
-       return render_template('trace.html')
+    if request.method == "GET":
+        return render_template('trace.html')
 
-   if 'file' not in request.files:
-       return jsonify({"error": "No file part", "success": False}), 400
-   
-   file = request.files['file']
-   
-   if file.filename == '':
-       return jsonify({"error": "No selected file", "success": False}), 400
-   
-   if file:
-       try:
-           code = file.read().decode('utf-8')
-           logger.debug(f"Raw code content: {code}")
-           
-           if not code:
-               return jsonify({"error": "Empty file", "success": False}), 400
-               
-           logger.debug("Generating trace...")
-           trace_results = generate_trace(code)
-           
-           if not trace_results:
-               logger.error("No trace results generated")
-               return jsonify({"error": "No analysis results", "success": False}), 500
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part", "success": False}), 400
 
-           logger.debug(f"Trace structure: {list(trace_results.keys())}")
-           logger.debug(f"Number of trace lines: {len(trace_results.get('trace', []))}")
-           logger.debug(f"Variable histories: {list(trace_results.get('execution', {}).get('variable_histories', {}).keys())}")
+    file = request.files['file']
 
-           return jsonify(trace_results)
-           
-       except Exception as e:
-           logger.error(f"Trace error: {e}", exc_info=True)
-           return jsonify({
-               "error": f"Failed to generate trace: {str(e)}", 
-               "success": False
-           }), 500
+    if file.filename == '':
+        return jsonify({"error": "No selected file", "success": False}), 400
+
+    if file:
+        try:
+            # Secure the filename and create the full path
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            # Save the uploaded file
+            file.save(filepath)
+            
+            try:
+                # Read the saved file
+                with open(filepath, 'rb') as f:
+                    bytecode = f.read()
+                
+                # Generate the trace
+                logger.debug("Generating trace...")
+                trace_results = generate_trace(bytecode)
+
+                if not trace_results:
+                    logger.error("No trace results generated")
+                    return jsonify({"error": "No analysis results", "success": False}), 500
+
+                # Log debug information
+                logger.debug(f"Trace structure: {list(trace_results.keys())}")
+                logger.debug(f"Number of trace lines: {len(trace_results.get('trace', []))}")
+                logger.debug(f"Variable histories: {list(trace_results.get('execution', {}).get('variable_histories', {}).keys())}")
+
+                return jsonify(trace_results)
+
+            finally:
+                # Clean up: remove the temporary file
+                try:
+                    os.remove(filepath)
+                except Exception as e:
+                    logger.warning(f"Failed to remove temporary file {filepath}: {e}")
+
+        except Exception as e:
+            logger.error(f"Trace error: {e}", exc_info=True)
+            return jsonify({
+                "error": f"Failed to generate trace: {str(e)}",
+                "success": False
+            }), 500
+
+    return jsonify({"error": "Invalid request", "success": False}), 400
+
    
-
 @app.route('/api/memory', methods=["GET", "POST"])
 def get_memory():
     try:
